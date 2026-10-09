@@ -1,0 +1,51 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: shopping-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: thanachart
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "P@ssw0rd"
+    ports:
+      - "5431:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d thanachart"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./server/Api
+      dockerfile: Dockerfile
+    container_name: shopping-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DbConnection: "Server=db;Port=5432;Database=thanachart;Username=postgres;Password=P@ssw0rd;"
+    ports:
+      - "5050:8080"
+
+  frontend:
+    build:
+      context: ./client/shopping-cart
+      dockerfile: Dockerfile
+      args:
+        # เบราว์เซอร์เรียก API จากเครื่องผู้ใช้ จึงใช้ localhost ไม่ใช่ชื่อ service
+        NEXT_PUBLIC_API_URL: http://localhost:5050/
+    container_name: shopping-web
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
